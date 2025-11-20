@@ -1,1 +1,6 @@
 data/10ks-raw/
+data/processed/
+
+data/vectorstore/ 
+
+data/finder_data/

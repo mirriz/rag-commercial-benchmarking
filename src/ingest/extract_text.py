@@ -1,12 +1,11 @@
 import os
 from bs4 import BeautifulSoup
 
-# === CONFIGURATION ===
-input_folder = 'data/10k-raw-html'  # Folder of HTML files
-output_folder = 'data/10k-txt'   # Folder to save text files
+input_folder = 'data/10k-raw-html' 
+output_folder = 'data/10k-txt'   
 
 
-# Loop through HTML files 
+# Loop through raw TML files 
 for filename in os.listdir(input_folder):
     if filename.lower().endswith(".html"):
         input_path = os.path.join(input_folder, filename)

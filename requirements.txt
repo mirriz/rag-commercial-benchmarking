@@ -1,0 +1,26 @@
+# RAG Framework
+langchain
+llama_index
+
+# Data Handling & Ingestion
+datasets
+pandas
+bs4
+numpy
+requests
+
+# RAG Components 
+sentence-transformers
+
+# Local Vector Database 
+chromadb
+
+# Local LLM Server
+ollama
+
+# Evaluation
+ragas
+
+# Utilities
+python-dotenv
+unstructured
