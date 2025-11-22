@@ -17,10 +17,10 @@ VECTOR_STORE_DIR = "data/vectorstore"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "finder_rag_collection" 
 OLLAMA_MODEL = "llama3" 
-SIMILARITY_TOP_K = 3 
+SIMILARITY_TOP_K = 5 
 
 
-def initialize_rag_system():
+def initialise_rag_system():
     """
     Initializes self-hosted RAG query engine by connecting to the
     vector store and the local LLM 
@@ -56,7 +56,7 @@ def initialize_rag_system():
         print(f"Error loading ChromaDB: {e}. Ensure create_vectorstore.py was run")
         return None
 
-    # Initialize Local LLM 
+    # Initialise Local LLM 
     try:
         llm = LlamaIndexOllama(model=OLLAMA_MODEL, temperature=0.0, request_timeout=300)
         print(f"Local LLM '{OLLAMA_MODEL}' connected directly via LlamaIndexOllama")
@@ -89,10 +89,10 @@ def run_rag_query(query_engine, question):
     return answer, source_nodes
 
 if __name__ == "__main__":
-    rag_query_engine = initialize_rag_system()
+    rag_query_engine = initialise_rag_system()
 
     if rag_query_engine:
-        test_question = "Impact on NVDA share repurchases from the excise tax in IRA."
+        test_question = "Retrive data about NVDA"
         
         answer, sources = run_rag_query(rag_query_engine, test_question)
 

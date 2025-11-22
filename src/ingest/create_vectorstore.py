@@ -11,8 +11,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 RAW_DATA_PATH = "data/10ks-raw/"
-PROCESSED_DATA_PATH = "data/processed/" 
-CHUNKS_FILE_NAME = "chunks.jsonl"
 
 CHUNK_SIZE = 1000  # TODO: Tune these values 
 CHUNK_OVERLAP = 200
@@ -25,9 +23,8 @@ COLLECTION_NAME = "finder_rag_collection"
 
 
 def load_and_split_documents():
-    """Loads all documents from the raw 10-k directory and splits them"""
+    """Loads all documents from the raw 10-k directory and splits them."""
     
-
     print(f"Loading documents from {RAW_DATA_PATH}...")
     loader = DirectoryLoader(RAW_DATA_PATH, glob="**/*.txt", silent_errors=True)
     documents = loader.load()
@@ -39,28 +36,15 @@ def load_and_split_documents():
         separators=["\n\n", "\n", " ", ""]
     )
     chunks = text_splitter.split_documents(documents)
+
+    for chunk in chunks:
+        # Ensure a clean file_name is added to the metadata filtering
+        file_path = chunk.metadata.get('source', '')
+        company = os.path.basename(file_path)
+        company = company.replace('.txt', '')
+        chunk.metadata['company_ticker'] = company
     
-    
-    chunks_data = [
-        {
-            "id": i, # Assign a chunk ID
-            "text": chunk.page_content,
-            "metadata": chunk.metadata,
-        }
-        for i, chunk in enumerate(chunks)
-    ]
-    
-    output_path = os.path.join(PROCESSED_DATA_PATH, CHUNKS_FILE_NAME)
-    
-    print(f"Saving {len(chunks)} chunk metadata to {output_path}...")
-    
-    
-    # Write each chunk as a separate JSON object
-    with open(output_path, 'w', encoding='utf-8') as f:
-        for item in chunks_data:
-            f.write(json.dumps(item) + '\n') 
-            
-    print(f"Loaded {len(documents)} documents and created {len(chunks)} chunks.")
+    print(chunks)
 
 
     return chunks
@@ -129,6 +113,5 @@ def create_and_save_vectorstore(chunks):
 
 
 if __name__ == "__main__":
-    check_vectorstore_contents()
-    #chunks = load_and_split_documents()
-    #create_and_save_vectorstore(chunks)
+    chunks = load_and_split_documents()
+    create_and_save_vectorstore(chunks)
