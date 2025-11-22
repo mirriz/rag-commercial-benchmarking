@@ -1,5 +1,7 @@
 import os
 import json
+import torch
+import chromadb
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.vectorstores import Chroma
@@ -17,12 +19,13 @@ CHUNK_OVERLAP = 200
 
 VECTOR_STORE_DIR = "data/vectorstore"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+COLLECTION_NAME = "finder_rag_collection" 
 
 
 
 
 def load_and_split_documents():
-    """Loads all documents from the raw 10-k directory and splits them."""
+    """Loads all documents from the raw 10-k directory and splits them"""
     
 
     print(f"Loading documents from {RAW_DATA_PATH}...")
@@ -57,7 +60,7 @@ def load_and_split_documents():
         for item in chunks_data:
             f.write(json.dumps(item) + '\n') 
             
-    print(f"✅ Loaded {len(documents)} documents and created {len(chunks)} chunks.")
+    print(f"Loaded {len(documents)} documents and created {len(chunks)} chunks.")
 
 
     return chunks
@@ -65,16 +68,46 @@ def load_and_split_documents():
 
 
 
+def check_vectorstore_contents():
+    """Loads the vector store and prints the contents of the collection."""
+    try:
+        client = chromadb.PersistentClient(path=VECTOR_STORE_DIR)
+        
+        # 2. Get the specific collection
+        collection = client.get_collection(COLLECTION_NAME)
+
+        contents = collection.get(
+            limit=5, 
+            include=['documents', 'metadatas']
+        )
+        
+        print(f"Total documents (chunks) in collection '{COLLECTION_NAME}': {collection.count()}")
+        
+        if contents['documents']:
+            print("\n--- Sample Chunk (First 5) ---")
+            for i in range(len(contents['documents'])):
+                print(f"Chunk {i+1} Metadata: {contents['metadatas'][i]}")
+                print(f"Chunk {i+1} Text (First 100 chars): {contents['documents'][i][:100]}...")
+                print("-" * 20)
+        else:
+            print("Collection is empty.")
+            
+    except Exception as e:
+        print(f"❌ Error checking vector store contents: {e}")
 
 
-# Embeds document chunks and saves the vector store locally
+
+
+
+
 def create_and_save_vectorstore(chunks):
-    
+    """Embeds document chunks and saves the vector store locally"""
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     # Initialise local embedding model
-    print(f"Initializing embedding model: {EMBEDDING_MODEL_NAME}...")
+    print(f"Initialising embedding model: {EMBEDDING_MODEL_NAME}...")
     embeddings = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL_NAME,
-        model_kwargs={'device': 'cpu'} # Or 'cuda' if you have an NVIDIA GPU
+        model_kwargs={'device': device} # 'cpu' if GPU not available
     )
 
     # Create the vector store
@@ -82,10 +115,11 @@ def create_and_save_vectorstore(chunks):
     vectorstore = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
-        persist_directory=VECTOR_STORE_DIR
+        persist_directory=VECTOR_STORE_DIR,
+        collection_name="finder_rag_collection"
     )
     vectorstore.persist()
-    print("✅ Vector Store creation complete.")
+    print("Vector Store creation complete.")
     
     # Return the vectorstore object if needed
     return vectorstore
@@ -95,5 +129,6 @@ def create_and_save_vectorstore(chunks):
 
 
 if __name__ == "__main__":
-    chunks = load_and_split_documents()
-    create_and_save_vectorstore(chunks)
+    check_vectorstore_contents()
+    #chunks = load_and_split_documents()
+    #create_and_save_vectorstore(chunks)
