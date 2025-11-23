@@ -12,7 +12,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 
-
+# Settings
 VECTOR_STORE_DIR = "data/vectorstore"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "finder_rag_collection" 
