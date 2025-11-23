@@ -2,37 +2,60 @@ import os
 import chromadb
 import torch
 
-
 from llama_index.core import VectorStoreIndex
-
 from llama_index.llms.ollama import Ollama as LlamaIndexOllama
 from llama_index.embeddings.langchain import LangchainEmbedding 
 from llama_index.vector_stores.chroma import ChromaVectorStore 
 
+# Re-ranking imports
+from llama_index.core.postprocessor import SentenceTransformerRerank
+
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
-
-
+# --- CONFIGURATION ---
 VECTOR_STORE_DIR = "data/vectorstore"
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "finder_rag_collection" 
-OLLAMA_MODEL = "llama3" 
-SIMILARITY_TOP_K = 5 
 
+# Advanced RAG: Matching the ingestion model
+EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
+
+# Reranker Model (Cross-Encoder)
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+OLLAMA_MODEL = "llama3" 
+
+# Retrieval Settings
+RETRIEVAL_TOP_K = 20  # Fetch a broad net of candidates
+RERANK_TOP_N = 5      # Filter down to the absolute best 5 for the LLM
+
+SYSTEM_PROMPT = """
+You are an expert financial analyst assistant.  
+Your goal is to provide accurate, concise answers based ONLY on provided context from SEC 10-K filings.
+Focus on finding the relevant answer for the specified company in the question. 
+
+Guidelines:
+1. Identify the specific company and metric requested.
+2. If the context contains the answer, extract the exact number or text.
+3. If a calculation is required (e.g. Gross Profit), perform it step-by-step using data from the context.
+4. If the context does NOT contain the answer, say "Data not available in context."
+5. Do not hallucinate or use outside knowledge.
+"""
 
 def initialise_rag_system():
     """
-    Initializes self-hosted RAG query engine by connecting to the
-    vector store and the local LLM 
+    Initialises self-hosted RAG query engine with BGE Embeddings and Re-ranking.
     """
-    print("\n--- Initialising Self-Hosted System ---")
+    print("\n--- Initialising RAG System ---")
     
-    # Initialise Embedding Model
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Running on device: {device}")
+
+    # Initialise Embedding Model
     try:
         base_embed = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL_NAME,
-            model_kwargs={'device': device} 
+            model_kwargs={'device': device},
+            encode_kwargs={'normalize_embeddings': True}
         )
         embed_model = LangchainEmbedding(base_embed)
         print(f"Embedding Model '{EMBEDDING_MODEL_NAME}' initialised")
@@ -44,7 +67,6 @@ def initialise_rag_system():
     try:
         db = chromadb.PersistentClient(path=VECTOR_STORE_DIR)
         chroma_collection = db.get_or_create_collection(COLLECTION_NAME)
-        
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         
         index = VectorStoreIndex.from_vector_store(
@@ -56,29 +78,48 @@ def initialise_rag_system():
         print(f"Error loading ChromaDB: {e}. Ensure create_vectorstore.py was run")
         return None
 
-    # Initialise Local LLM 
+    # Initialise Local LLM
     try:
-        llm = LlamaIndexOllama(model=OLLAMA_MODEL, temperature=0.0, request_timeout=300)
-        print(f"Local LLM '{OLLAMA_MODEL}' connected directly via LlamaIndexOllama")
+        llm = LlamaIndexOllama(
+            model=OLLAMA_MODEL, 
+            temperature=0.0, 
+            request_timeout=300, 
+            system_prompt=SYSTEM_PROMPT
+        )
+        print(f"Local LLM '{OLLAMA_MODEL}' connected")
     except Exception as e:
-        print(f"Error initialising Ollama LLM: {e}. Is Ollama application running?")
+        print(f"Error initialising Ollama LLM: {e}")
         return None
 
-    # Create the Query Engine
+    # Initialise Re-ranker
+    try:
+        print(f"Loading Re-ranker: {RERANKER_MODEL}...")
+        reranker = SentenceTransformerRerank(
+            model=RERANKER_MODEL, 
+            top_n=RERANK_TOP_N,
+            device=device
+        )
+        print("Re-ranker loaded.")
+    except Exception as e:
+        print(f"Error loading Re-ranker: {e}")
+        return None
+
+    # 5. Create the Query Engine with Post-Processing
     query_engine = index.as_query_engine(
         llm=llm,
-        similarity_top_k=SIMILARITY_TOP_K,
+        similarity_top_k=RETRIEVAL_TOP_K, # Retrieve 20
+        node_postprocessors=[reranker]    # Filter to 5
     )
 
     print("--- Initialisation Complete ---")
     return query_engine
 
 def run_rag_query(query_engine, question):
-    """Executes a RAG query and returns the answer and source chunks."""
+    """Executes a RAG query and returns the answer and source chunks"""
     if query_engine is None:
-        return "RAG system failed to initialize.", []
+        return "RAG system failed to initialise.", []
 
-    print(f"\n> Querying Self-Hosted System: {question}")
+    print(f"\n> Querying: {question}")
     
     # Execute the query
     response = query_engine.query(question)
@@ -92,26 +133,24 @@ if __name__ == "__main__":
     rag_query_engine = initialise_rag_system()
 
     if rag_query_engine:
-        test_question = "Retrive data about NVDA"
+        # Example Test
+        test_question = "What was the Gross profit for Analog Devices (ADI) in 2024?"
         
         answer, sources = run_rag_query(rag_query_engine, test_question)
 
         print("\n" + "="*70)
         print(f"| Final Answer:")
-        cleaned_answer = answer.strip().replace('\n', ' ') 
-        print(f"| {cleaned_answer}")
+        print(f"| {answer.strip()}")
         print("="*70)
         
         if sources:
-            print(f"| Retrieved {len(sources)} Source Chunks:")
+            print(f"| Retrieved & Re-ranked {len(sources)} Source Chunks:")
             for i, node in enumerate(sources):
-                metadata = node.metadata
-                source_file = metadata.get('source', 'N/A').split('\\')[-1].split('/')[-1]
                 score = round(node.score, 4)
-                
-                cleaned_chunk_text = node.text[:180].replace('\n', ' ')
-                print(f"| --- Source {i+1} ({source_file}, Score: {score}) ---")
-                print(f"| ... {cleaned_chunk_text} ...")
+                # Text usually comes with the [COMPANY] tag now
+                cleaned_text = node.text[:200].replace('\n', ' ')
+                print(f"| --- Rank {i+1} (Score: {score}) ---")
+                print(f"| {cleaned_text}...")
         else:
             print("No source nodes retrieved")
         print("="*70)

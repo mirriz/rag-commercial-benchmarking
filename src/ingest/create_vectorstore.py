@@ -1,26 +1,22 @@
 import os
-import json
 import torch
 import chromadb
+import shutil
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
-
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-
 RAW_DATA_PATH = "data/10ks-raw/"
-
-CHUNK_SIZE = 1000  # TODO: Tune these values 
-CHUNK_OVERLAP = 200
-
 VECTOR_STORE_DIR = "data/vectorstore"
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+
+# Switched to BGE-Base (Better than MiniLM)
+EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 COLLECTION_NAME = "finder_rag_collection" 
 
-
-
+CHUNK_SIZE = 512  
+CHUNK_OVERLAP = 64
 
 def load_and_split_documents():
     """Loads all documents from the raw 10-k directory and splits them."""
@@ -28,6 +24,7 @@ def load_and_split_documents():
     print(f"Loading documents from {RAW_DATA_PATH}...")
     loader = DirectoryLoader(RAW_DATA_PATH, glob="**/*.txt", silent_errors=True)
     documents = loader.load()
+    print(f"Loaded {len(documents)} source files.")
 
     # Split the documents for RAG
     text_splitter = RecursiveCharacterTextSplitter(
@@ -37,81 +34,71 @@ def load_and_split_documents():
     )
     chunks = text_splitter.split_documents(documents)
 
+    # Prepend the company ticker to the text of every chunk.
     for chunk in chunks:
-        # Ensure a clean file_name is added to the metadata filtering
         file_path = chunk.metadata.get('source', '')
-        company = os.path.basename(file_path)
-        company = company.replace('.txt', '')
+        company = os.path.basename(file_path).replace('.txt', '')
+        chunk.page_content = f"[COMPANY: {company}] {chunk.page_content}"
         chunk.metadata['company_ticker'] = company
     
-    print(chunks)
-
-
+    print(f"Created {len(chunks)} total enriched chunks.")
     return chunks
 
+def create_and_save_vectorstore(chunks):
+    """Embeds document chunks and saves the vector store locally"""
+    
+    # Check if vectorstore exists and clear it to prevent duplicating data on re-runs
+    if os.path.exists(VECTOR_STORE_DIR):
+        print(f"Removing existing vectorstore at {VECTOR_STORE_DIR} to rebuild...")
+        shutil.rmtree(VECTOR_STORE_DIR)
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Initialising embedding model '{EMBEDDING_MODEL_NAME}' on {device}...")
+    
+    # BGE requires specific parameters for best performance
+    model_kwargs = {'device': device}
+    encode_kwargs = {'normalize_embeddings': True} # BGE recommendation
 
+    embeddings = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL_NAME,
+        model_kwargs=model_kwargs,
+        encode_kwargs=encode_kwargs
+    )
+
+    print(f"Creating and saving ChromaDB to {VECTOR_STORE_DIR}...")
+    vectorstore = Chroma.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        persist_directory=VECTOR_STORE_DIR,
+        collection_name=COLLECTION_NAME
+    )
+    vectorstore.persist()
+    print("Vector Store creation complete.")
+    return vectorstore
 
 def check_vectorstore_contents():
-    """Loads the vector store and prints the contents of the collection."""
+    """Loads the vector store and prints the contents of the collection for verification."""
     try:
         client = chromadb.PersistentClient(path=VECTOR_STORE_DIR)
-        
-        # 2. Get the specific collection
         collection = client.get_collection(COLLECTION_NAME)
 
-        contents = collection.get(
-            limit=5, 
-            include=['documents', 'metadatas']
-        )
+        count = collection.count()
+        print(f"Total documents (chunks) in collection '{COLLECTION_NAME}': {count}")
         
-        print(f"Total documents (chunks) in collection '{COLLECTION_NAME}': {collection.count()}")
-        
-        if contents['documents']:
-            print("\n--- Sample Chunk (First 5) ---")
-            for i in range(len(contents['documents'])):
-                print(f"Chunk {i+1} Metadata: {contents['metadatas'][i]}")
-                print(f"Chunk {i+1} Text (First 100 chars): {contents['documents'][i][:100]}...")
-                print("-" * 20)
+        # Test output of one chunk
+        if count > 0:
+            contents = collection.get(limit=1, include=['documents', 'metadatas'])
+            print(f"Sample Chunk: {contents['documents'][0][:150]}...")
+            print(f"Metadata: {contents['metadatas'][0]}")
         else:
             print("Collection is empty.")
             
     except Exception as e:
         print(f"❌ Error checking vector store contents: {e}")
 
-
-
-
-
-
-def create_and_save_vectorstore(chunks):
-    """Embeds document chunks and saves the vector store locally"""
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    # Initialise local embedding model
-    print(f"Initialising embedding model: {EMBEDDING_MODEL_NAME}...")
-    embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL_NAME,
-        model_kwargs={'device': device} # 'cpu' if GPU not available
-    )
-
-    # Create the vector store
-    print(f"Creating and saving ChromaDB to {VECTOR_STORE_DIR}...")
-    vectorstore = Chroma.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        persist_directory=VECTOR_STORE_DIR,
-        collection_name="finder_rag_collection"
-    )
-    vectorstore.persist()
-    print("Vector Store creation complete.")
-    
-    # Return the vectorstore object if needed
-    return vectorstore
-
-
-
-
-
 if __name__ == "__main__":
-    chunks = load_and_split_documents()
-    create_and_save_vectorstore(chunks)
+    doc_chunks = load_and_split_documents()
+    
+    create_and_save_vectorstore(doc_chunks)
+    
+    #check_vectorstore_contents()
