@@ -94,7 +94,7 @@ def check_vectorstore_contents():
             print("Collection is empty.")
             
     except Exception as e:
-        print(f"❌ Error checking vector store contents: {e}")
+        print(f"Error checking vector store contents: {e}")
 
 if __name__ == "__main__":
     doc_chunks = load_and_split_documents()
