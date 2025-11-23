@@ -12,10 +12,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 RAW_DATA_PATH = "data/10ks-raw/"
 
-CHUNK_SIZE = 1000  # TODO: Tune these values 
-CHUNK_OVERLAP = 200
+CHUNK_SIZE = 512  # TODO: Tune these values 
+CHUNK_OVERLAP = 64
 
-VECTOR_STORE_DIR = "data/vectorstore"
+VECTOR_STORE_DIR = "data/vectorstore-v1"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "finder_rag_collection" 
 

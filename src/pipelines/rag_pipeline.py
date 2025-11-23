@@ -13,7 +13,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 
 
 # Settings
-VECTOR_STORE_DIR = "data/vectorstore"
+VECTOR_STORE_DIR = "data/vectorstore-v1"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "finder_rag_collection" 
 OLLAMA_MODEL = "llama3" 
@@ -22,7 +22,7 @@ SIMILARITY_TOP_K = 5
 
 def initialise_rag_system():
     """
-    Initializes self-hosted RAG query engine by connecting to the
+    Initialises self-hosted RAG query engine by connecting to the
     vector store and the local LLM 
     """
     print("\n--- Initialising Self-Hosted System ---")
@@ -61,7 +61,7 @@ def initialise_rag_system():
         llm = LlamaIndexOllama(model=OLLAMA_MODEL, temperature=0.0, request_timeout=300)
         print(f"Local LLM '{OLLAMA_MODEL}' connected directly via LlamaIndexOllama")
     except Exception as e:
-        print(f"Error initialising Ollama LLM: {e}. Is Ollama application running?")
+        print(f"Error initialising Ollama LLM: {e}")
         return None
 
     # Create the Query Engine
