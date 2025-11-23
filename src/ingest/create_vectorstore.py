@@ -57,7 +57,7 @@ def create_and_save_vectorstore(chunks):
     
     # BGE requires specific parameters for best performance
     model_kwargs = {'device': device}
-    encode_kwargs = {'normalize_embeddings': True} # BGE recommendation
+    encode_kwargs = {'normalize_embeddings': True}
 
     embeddings = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL_NAME,

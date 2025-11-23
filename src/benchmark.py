@@ -10,13 +10,12 @@ from pipelines.rag_pipeline import initialise_rag_system, run_rag_query
 # --- CONFIGURATION ---
 OUTPUT_DIR = "data/benchmark_results"
 OUTPUT_FILE = "local_rag_evaluation_dataset.json"
-# Set to None to run the FULL dataset, or an integer (e.g., 10, 50) for a quick test run
-SAMPLE_SIZE = 250 
+SAMPLE_SIZE = 250 # Set to None to run the FULL dataset
 
 def run_benchmark():
     print("STARTING LOCAL RAG BENCHMARKING")
 
-    # 2. Load Benchmark Data (Golden Set)
+    # Load Benchmark Data 
     print("\nLoading FinDER QA Benchmark Data...")
     try:
         questions, ground_truths, ground_truth_contexts = get_qa_benchmark_data()
