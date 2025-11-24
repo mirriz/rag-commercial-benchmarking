@@ -7,3 +7,5 @@ data/finder_data/
 data/security_benchmark_dataset/
 data/benchmark_results/
 data/vectorstore-v1/
+results/
+__pycache__/
