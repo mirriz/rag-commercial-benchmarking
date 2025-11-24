@@ -25,8 +25,8 @@ RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 OLLAMA_MODEL = "llama3" 
 
 # Retrieval Settings
-RETRIEVAL_TOP_K = 20  # Fetch a broad net of candidates
-RERANK_TOP_N = 5      # Filter down to the absolute best 5 for the LLM
+RETRIEVAL_TOP_K = 25  # Fetch a broad net of candidates
+RERANK_TOP_N = 10      # Filter down to the absolute best 10 for the LLM
 
 SYSTEM_PROMPT = """
 You are an expert financial analyst assistant.  
@@ -37,8 +37,8 @@ Guidelines:
 1. Identify the specific company and metric requested.
 2. If the context contains the answer, extract the exact number or text.
 3. If a calculation is required (e.g. Gross Profit), perform it step-by-step using data from the context.
-4. If the context does NOT contain the answer, say "Data not available in context."
-5. Do not hallucinate or use outside knowledge.
+4. Do not hallucinate or use outside knowledge.
+5. NEVER reference the fact you have retrieved documents, or looked at a specific area, or were not able to find information; just provide an answer.
 """
 
 def initialise_rag_system():
@@ -48,7 +48,6 @@ def initialise_rag_system():
     print("\n--- Initialising RAG System ---")
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Running on device: {device}")
 
     # Initialise Embedding Model
     try:
@@ -104,11 +103,11 @@ def initialise_rag_system():
         print(f"Error loading Re-ranker: {e}")
         return None
 
-    # 5. Create the Query Engine with Post-Processing
+    # Create the Query Engine with Post-Processing
     query_engine = index.as_query_engine(
         llm=llm,
-        similarity_top_k=RETRIEVAL_TOP_K, # Retrieve 20
-        node_postprocessors=[reranker]    # Filter to 5
+        similarity_top_k=RETRIEVAL_TOP_K, # Retrieve 25
+        node_postprocessors=[reranker]    # Filter to 10
     )
 
     print("--- Initialisation Complete ---")
@@ -134,7 +133,7 @@ if __name__ == "__main__":
 
     if rag_query_engine:
         # Example Test
-        test_question = "What was the Gross profit for Analog Devices (ADI) in 2024?"
+        test_question = "Annual effective tax rate and net profitability impact for CSCO."
         
         answer, sources = run_rag_query(rag_query_engine, test_question)
 

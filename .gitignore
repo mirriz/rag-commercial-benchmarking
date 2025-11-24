@@ -4,5 +4,6 @@ data/processed/
 data/vectorstore/ 
 data/finder_data/
 .env
+__pycache__/
 data/security_benchmark_dataset/
-data/benchmark_results/
+results/

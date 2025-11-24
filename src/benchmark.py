@@ -8,9 +8,9 @@ from ingest.download_data import get_qa_benchmark_data
 from pipelines.rag_pipeline import initialise_rag_system, run_rag_query
 
 # --- CONFIGURATION ---
-OUTPUT_DIR = "data/benchmark_results"
+OUTPUT_DIR = "results/"
 OUTPUT_FILE = "local_rag_evaluation_dataset.json"
-SAMPLE_SIZE = 250 # Set to None to run the FULL dataset
+SAMPLE_SIZE = 1000 # Set to None to run the FULL dataset
 
 def run_benchmark():
     print("STARTING LOCAL RAG BENCHMARKING")
