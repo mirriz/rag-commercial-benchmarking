@@ -1,7 +1,8 @@
 .venv/
 data/10ks-raw/
 data/processed/
-data/vectorstore/ 
+data/vectorstore-v1/ 
+data/vectorstore-v2/
 data/finder_data/
 .env
 __pycache__/

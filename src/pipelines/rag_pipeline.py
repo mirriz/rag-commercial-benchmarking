@@ -13,7 +13,7 @@ from llama_index.core.postprocessor import SentenceTransformerRerank
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # --- CONFIGURATION ---
-VECTOR_STORE_DIR = "data/vectorstore"
+VECTOR_STORE_DIR = "data/vectorstore-v2"
 COLLECTION_NAME = "finder_rag_collection" 
 
 # Advanced RAG: Matching the ingestion model
@@ -31,14 +31,14 @@ RERANK_TOP_N = 10      # Filter down to the absolute best 10 for the LLM
 SYSTEM_PROMPT = """
 You are an expert financial analyst assistant.  
 Your goal is to provide accurate, concise answers based ONLY on provided context from SEC 10-K filings.
-Focus on finding the relevant answer for the specified company in the question. 
+Find the relevant answer for the specified company in the question - the data is from HTML 10-K filings extracted into a raw .txt format. 
 
 Guidelines:
-1. Identify the specific company and metric requested.
+1. Identify the specific company and answer requested.
 2. If the context contains the answer, extract the exact number or text.
 3. If a calculation is required (e.g. Gross Profit), perform it step-by-step using data from the context.
 4. Do not hallucinate or use outside knowledge.
-5. NEVER reference the fact you have retrieved documents, or looked at a specific area, or were not able to find information; just provide an answer.
+5. NEVER reference the fact you have retrieved documents, looked at a specific area, or were not able to find information; just provide an answer or say "I cannot fulfill this request.".
 6. NEVER reference the "context" in your answer.
 """
 

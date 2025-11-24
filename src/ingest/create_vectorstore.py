@@ -9,7 +9,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 RAW_DATA_PATH = "data/10ks-raw/"
-VECTOR_STORE_DIR = "data/vectorstore"
+VECTOR_STORE_DIR = "data/vectorstore-v2"
 
 # Switched to BGE-Base (Better than MiniLM)
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
@@ -27,7 +27,7 @@ def load_and_split_documents():
     print(f"Loaded {len(documents)} source files.")
 
     # Split the documents for RAG
-    text_splitter = RecursiveCharacterTextSplitter(
+    text_splitter = RecursiveCharacterTextSplitter(#
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
         separators=["\n\n", "\n", " ", ""]

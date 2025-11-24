@@ -9,8 +9,8 @@ from pipelines.rag_pipeline import initialise_rag_system, run_rag_query
 
 
 OUTPUT_DIR = "results/"
-OUTPUT_FILE = "local_rag_evaluation_dataset.json"
-SAMPLE_SIZE = 750 # Set to None to run the FULL dataset
+OUTPUT_FILE = "local_rag_v2_evaluation_dataset.json"
+SAMPLE_SIZE = 500 # Set to None to run the FULL dataset
 
 def run_benchmark():
     print("STARTING LOCAL RAG BENCHMARKING")
