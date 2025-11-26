@@ -6,6 +6,9 @@ from llama_index.core import VectorStoreIndex
 from llama_index.llms.ollama import Ollama as LlamaIndexOllama
 from llama_index.embeddings.langchain import LangchainEmbedding 
 from llama_index.vector_stores.chroma import ChromaVectorStore 
+from llama_index.retrievers.bm25 import BM25Retriever
+from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.query_engine import RetrieverQueryEngine
 
 # Re-ranking imports
 from llama_index.core.postprocessor import SentenceTransformerRerank
@@ -26,7 +29,7 @@ OLLAMA_MODEL = "llama3"
 
 # Retrieval Settings
 RETRIEVAL_TOP_K = 25  # Fetch a broad net of candidates
-RERANK_TOP_N = 10      # Filter down to the absolute best 10 for the LLM
+RERANK_TOP_N = 10      # Filter down to the best 10 for the LLM
 
 SYSTEM_PROMPT = """
 You are the worlds best financial analyst assistant with extensive knowledge on SEC 10-k filings.  
@@ -74,6 +77,26 @@ def initialise_rag_system():
             vector_store=vector_store, 
             embed_model=embed_model,
         )
+
+        # Vector Retriever
+        vector_retriever = index.as_retriever(similarity_top_k=25)
+
+        # Keyword Retriever 
+        bm25_retriever = BM25Retriever.from_defaults(
+            nodes=index.docstore.docs.values(), 
+            similarity_top_k=25
+        )
+
+        # Fuse retrivers
+        retriever = QueryFusionRetriever(
+            [vector_retriever, bm25_retriever],
+            similarity_top_k=25,
+            num_queries=1,  # Can generate sub-queries too
+            mode="reciprocal_rerank",
+            use_async=True,
+        )
+
+
         print(f"Vector Store '{COLLECTION_NAME}' loaded from disk")
     except Exception as e:
         print(f"Error loading ChromaDB: {e}. Ensure create_vectorstore.py was run")
@@ -106,10 +129,11 @@ def initialise_rag_system():
         return None
 
     # Create the Query Engine with Post-Processing
-    query_engine = index.as_query_engine(
+    query_engine = RetrieverQueryEngine.from_args(
+        retriever=retriever,
+        node_postprocessors=[reranker], # Your existing reranker
         llm=llm,
-        similarity_top_k=RETRIEVAL_TOP_K, # Retrieve 25
-        node_postprocessors=[reranker]    # Filter to 10
+        response_mode="tree_summarize"
     )
 
     print("--- Initialisation Complete ---")
