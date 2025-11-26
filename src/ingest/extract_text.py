@@ -15,10 +15,18 @@ def clean_financial_string(text):
     
     
     # 3. Collapse excessive newlines
-    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r'\n{2,}', '\n', text)
 
     # Converts unicode chars to readable text
     text = text.replace('☒', '[x]').replace('☐', '[ ]')
+
+    text = text.replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')
+
+    text = text.replace('\u2013','-').replace('\u2014','-')
+
+    text = text.replace("\u00a0", " ").replace("\u00f7", "÷") .replace("\u00d7", "×") .replace("\u2248", "≈")
+
+    text = text.replace('•', '').replace('®', '')
     
 
     return text.strip()
