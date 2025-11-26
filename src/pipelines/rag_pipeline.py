@@ -39,7 +39,7 @@ Guidelines:
 3. If a calculation is required (e.g. Gross Profit), perform it step-by-step using data from the context.
 4. Do not hallucinate or use outside knowledge.
 5. NEVER reference the fact you have retrieved documents, looked at a specific area, or were not able to find information; just provide an answer or say "I cannot fulfill this request.".
-6. NEVER reference the "context" in your answer.
+6. State the response / explanation and the response / explanation ALONE. No filler text
 """
 
 def initialise_rag_system():
