@@ -1,15 +1,12 @@
 import os
 import chromadb
 import torch
-import pickle
 
 from llama_index.core import VectorStoreIndex, get_response_synthesizer
 from llama_index.llms.ollama import Ollama as LlamaIndexOllama
 from llama_index.embeddings.langchain import LangchainEmbedding 
 from llama_index.vector_stores.chroma import ChromaVectorStore 
 from llama_index.core.query_engine import RetrieverQueryEngine
-
-# Re-ranking imports
 from llama_index.core.postprocessor import SentenceTransformerRerank
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -19,12 +16,8 @@ VECTOR_STORE_DIR = "data/vectorstore-v2"
 COLLECTION_NAME = "finder_rag_collection" 
 NODES_CACHE_PATH = "data/bm25_nodes.pkl" 
 
-# Advanced RAG: Matching the ingestion model
-EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
-
-# Reranker Model (Cross-Encoder)
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
-
 OLLAMA_MODEL = "llama3" 
 
 # Retrieval Settings
@@ -36,6 +29,9 @@ You are the worlds best financial analyst with extensive knowledge on SEC 10-k f
 Your goal is to provide accurate, concise answers based on provided context from SEC 10-K filings you will be given.
 Find the relevant answer for the specified company in the question - the data is from HTML 10-K filings extracted into a raw .txt format. 
 Factually correct information is the top priority. Ensure you always address and answer the question.
+
+CRITICAL RULES:
+1. Check Company Labels: The context chunks start with [COMPANY: Ticker]. You MUST ONLY use chunks that match the company asked about in the user's question.
 
 Guidelines:
 1. Identify the specific company and answer requested.
@@ -58,12 +54,12 @@ def initialise_rag_system():
     # Initialise Embedding Model
     try:
         base_embed = HuggingFaceEmbeddings(
-            model_name=EMBEDDING_MODEL_NAME,
+            model_name=EMBEDDING_MODEL,
             model_kwargs={'device': device},
             encode_kwargs={'normalize_embeddings': True}
         )
         embed_model = LangchainEmbedding(base_embed)
-        print(f"Embedding Model '{EMBEDDING_MODEL_NAME}' initialised")
+        print(f"Embedding Model '{EMBEDDING_MODEL}' initialised")
     except Exception as e:
         print(f"Error initialising embedding model: {e}")
         return None
@@ -148,7 +144,7 @@ if __name__ == "__main__":
 
     if rag_query_engine:
         # Test
-        test_question = "ADSK's tech asset acquisitions drive mkt growth."
+        test_question = "Delta in CBOE Data & Access Solutions rev from 2021-23."
         
         answer, sources = run_rag_query(rag_query_engine, test_question)
 
