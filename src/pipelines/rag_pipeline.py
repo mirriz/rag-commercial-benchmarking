@@ -1,13 +1,12 @@
 import os
 import chromadb
 import torch
+import pickle
 
-from llama_index.core import VectorStoreIndex
+from llama_index.core import VectorStoreIndex, get_response_synthesizer
 from llama_index.llms.ollama import Ollama as LlamaIndexOllama
 from llama_index.embeddings.langchain import LangchainEmbedding 
 from llama_index.vector_stores.chroma import ChromaVectorStore 
-from llama_index.retrievers.bm25 import BM25Retriever
-from llama_index.core.retrievers import QueryFusionRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 
 # Re-ranking imports
@@ -18,24 +17,25 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 # --- CONFIGURATION ---
 VECTOR_STORE_DIR = "data/vectorstore-v2"
 COLLECTION_NAME = "finder_rag_collection" 
+NODES_CACHE_PATH = "data/bm25_nodes.pkl" 
 
 # Advanced RAG: Matching the ingestion model
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
 # Reranker Model (Cross-Encoder)
-RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 
 OLLAMA_MODEL = "llama3" 
 
 # Retrieval Settings
-RETRIEVAL_TOP_K = 25  # Fetch a broad net of candidates
+RETRIEVAL_TOP_K = 75  # Fetch a broad net of candidates
 RERANK_TOP_N = 10      # Filter down to the best 10 for the LLM
 
 SYSTEM_PROMPT = """
-You are the worlds best financial analyst assistant with extensive knowledge on SEC 10-k filings.  
+You are the worlds best financial analyst with extensive knowledge on SEC 10-k filings.  
 Your goal is to provide accurate, concise answers based on provided context from SEC 10-K filings you will be given.
 Find the relevant answer for the specified company in the question - the data is from HTML 10-K filings extracted into a raw .txt format. 
-Factually correct information is the top priority.
+Factually correct information is the top priority. Ensure you always address and answer the question.
 
 Guidelines:
 1. Identify the specific company and answer requested.
@@ -43,7 +43,8 @@ Guidelines:
 3. You are permitted to do calculation. If a calculation is required (e.g. Gross Profit), perform it step-by-step using data from the context.
 4. Do not hallucinate or use outside knowledge.
 5. NEVER reference the fact you have retrieved documents, looked at a specific area, or were not able to find information; just provide an answer or say "I cannot fulfill this request.".
-6. State the response / explanation and the response / explanation ALONE.
+6. State the response / explanation ALONE.
+7. ALWAYS give reasoning and explanation for your answer. Single word or one sentence answers are not acceptable.
 """
 
 def initialise_rag_system():
@@ -79,27 +80,12 @@ def initialise_rag_system():
         )
 
         # Vector Retriever
-        vector_retriever = index.as_retriever(similarity_top_k=25)
-
-        # Keyword Retriever 
-        bm25_retriever = BM25Retriever.from_defaults(
-            nodes=index.docstore.docs.values(), 
-            similarity_top_k=25
-        )
-
-        # Fuse retrivers
-        retriever = QueryFusionRetriever(
-            [vector_retriever, bm25_retriever],
-            similarity_top_k=25,
-            num_queries=1,  # Can generate sub-queries too
-            mode="reciprocal_rerank",
-            use_async=True,
-        )
-
+        vector_retriever = index.as_retriever(similarity_top_k=RETRIEVAL_TOP_K)
 
         print(f"Vector Store '{COLLECTION_NAME}' loaded from disk")
+
     except Exception as e:
-        print(f"Error loading ChromaDB: {e}. Ensure create_vectorstore.py was run")
+        print(f"Error loading ChromaDB: {e}")
         return None
 
     # Initialise Local LLM
@@ -130,10 +116,13 @@ def initialise_rag_system():
 
     # Create the Query Engine with Post-Processing
     query_engine = RetrieverQueryEngine.from_args(
-        retriever=retriever,
-        node_postprocessors=[reranker], # Your existing reranker
+        retriever=vector_retriever,
+        node_postprocessors=[reranker],
+        response_synthesizer=get_response_synthesizer(
+            response_mode="tree_summarize", 
+            llm=llm
+        ),
         llm=llm,
-        response_mode="tree_summarize"
     )
 
     print("--- Initialisation Complete ---")
@@ -158,8 +147,8 @@ if __name__ == "__main__":
     rag_query_engine = initialise_rag_system()
 
     if rag_query_engine:
-        # Example Test
-        test_question = "Annual effective tax rate and net profitability impact for CSCO."
+        # Test
+        test_question = "ADSK's tech asset acquisitions drive mkt growth."
         
         answer, sources = run_rag_query(rag_query_engine, test_question)
 
