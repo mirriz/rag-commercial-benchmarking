@@ -2,21 +2,29 @@ import os
 import torch
 import chromadb
 import shutil
+import pickle
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from llama_index.core.schema import TextNode  
+
 RAW_DATA_PATH = "data/10ks-raw/"
 VECTOR_STORE_DIR = "data/vectorstore-v2"
+NODES_CACHE_PATH = "data/bm25_nodes/bm25_nodes.pkl"  
 
-# Switched to BGE-Base (Better than MiniLM)
+# Switched to BGE-Base
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 COLLECTION_NAME = "finder_rag_collection" 
 
 CHUNK_SIZE = 512  
 CHUNK_OVERLAP = 64
+
+
+
+
 
 def load_and_split_documents():
     """Loads all documents from the raw 10-k directory and splits them."""
@@ -27,7 +35,7 @@ def load_and_split_documents():
     print(f"Loaded {len(documents)} source files.")
 
     # Split the documents for RAG
-    text_splitter = RecursiveCharacterTextSplitter(#
+    text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
         separators=["\n\n", "\n", " ", ""]
@@ -44,10 +52,41 @@ def load_and_split_documents():
     print(f"Created {len(chunks)} total enriched chunks.")
     return chunks
 
+
+
+
+
+def save_nodes_for_bm25(langchain_chunks):
+    """
+    The bridge allowing the RAG pipeline to use langchain chunks for BM25.
+    """
+    print(f"Converting {len(langchain_chunks)} chunks to pickle")
+    
+    llama_nodes = []
+    for chunk in langchain_chunks:
+        node = TextNode(
+            text=chunk.page_content,
+            metadata=chunk.metadata
+        )
+        llama_nodes.append(node)
+
+    # Save
+    if not os.path.exists("data"):
+        os.makedirs("data")
+        
+    with open(NODES_CACHE_PATH, "wb") as f:
+        pickle.dump(llama_nodes, f)
+    
+    print(f"Saved BM25 nodes to {NODES_CACHE_PATH}")
+
+
+
+
+
 def create_and_save_vectorstore(chunks):
     """Embeds document chunks and saves the vector store locally"""
     
-    # Check if vectorstore exists and clear it to prevent duplicating data on re-runs
+    # Check if vectorstore exists
     if os.path.exists(VECTOR_STORE_DIR):
         print(f"Removing existing vectorstore at {VECTOR_STORE_DIR} to rebuild...")
         shutil.rmtree(VECTOR_STORE_DIR)
@@ -55,7 +94,7 @@ def create_and_save_vectorstore(chunks):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Initialising embedding model '{EMBEDDING_MODEL_NAME}' on {device}...")
     
-    # BGE requires specific parameters for best performance
+    # BGE requires specific parameters
     model_kwargs = {'device': device}
     encode_kwargs = {'normalize_embeddings': True}
 
@@ -72,33 +111,17 @@ def create_and_save_vectorstore(chunks):
         persist_directory=VECTOR_STORE_DIR,
         collection_name=COLLECTION_NAME
     )
-    vectorstore.persist()
+    vectorstore.persist() 
     print("Vector Store creation complete.")
     return vectorstore
 
-def check_vectorstore_contents():
-    """Loads the vector store and prints the contents of the collection for verification."""
-    try:
-        client = chromadb.PersistentClient(path=VECTOR_STORE_DIR)
-        collection = client.get_collection(COLLECTION_NAME)
 
-        count = collection.count()
-        print(f"Total documents (chunks) in collection '{COLLECTION_NAME}': {count}")
-        
-        # Test output of one chunk
-        if count > 0:
-            contents = collection.get(limit=1, include=['documents', 'metadatas'])
-            print(f"Sample Chunk: {contents['documents'][0][:150]}...")
-            print(f"Metadata: {contents['metadatas'][0]}")
-        else:
-            print("Collection is empty.")
-            
-    except Exception as e:
-        print(f"Error checking vector store contents: {e}")
+
+
 
 if __name__ == "__main__":
     doc_chunks = load_and_split_documents()
     
     create_and_save_vectorstore(doc_chunks)
     
-    #check_vectorstore_contents()
+    save_nodes_for_bm25(doc_chunks)
