@@ -1,7 +1,6 @@
 import os
 import json
 from dotenv import load_dotenv
-import pandas as pd
 from datasets import Dataset 
 
 from ragas import evaluate
@@ -13,8 +12,7 @@ from ragas.metrics import (
 )
 from ragas.run_config import RunConfig
 
-# --- CHANGE 1: Import the Azure class ---
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings 
 
 load_dotenv()
@@ -23,10 +21,10 @@ load_dotenv()
 INPUT_FILE = "results/local_rag_v2_evaluation_dataset.json"
 OUTPUT_FILE = "results/ragas_scores_for_localRAG.csv"
 
-# --- CHANGE 2: Set this to your Azure DEPLOYMENT Name ---
-# Go to Azure AI Studio -> Deployments to see the exact name.
-# It might be "gpt-4o" or something custom you typed like "my-gpt4o-app"
-JUDGE_MODEL = "gpt-4o"  
+#JUDGE_MODEL = "gpt-5.1"
+
+# Low Cost
+JUDGE_MODEL = "gpt-5-mini" 
 
 EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
@@ -46,8 +44,10 @@ def load_evaluation_data():
     }
 
     for entry in data:
+        # Filter out failed responses
         if entry.get("answer") == "Error generating response" or not entry.get("answer"):
-            continue
+            print("Not all answers generated. quitting evaluation")
+            return None
             
         ragas_dict["question"].append(entry["question"])
         ragas_dict["answer"].append(entry["answer"])
@@ -57,21 +57,21 @@ def load_evaluation_data():
     return Dataset.from_dict(ragas_dict)
 
 def run_ragas_evaluation():
-    print("--- STARTING RAGAS EVALUATION WITH GPT-4o (AZURE) ---")
+    print("--- STARTING RAGAS EVALUATION WITH STANDARD OPENAI ---")
     
-    if "AZURE_OPENAI_API_KEY" not in os.environ:
-        print("ERROR: AZURE_OPENAI_API_KEY not found in environment variables.")
+    if "OPENAI_API_KEY" not in os.environ:
+        print("OPENAI_API_KEY not found in environment variables")
         return
 
     dataset = load_evaluation_data()
     if not dataset: return
 
-    print(f"Initialising Judge (Deployment: {JUDGE_MODEL})...")
+    print(f"Initialising Judge {JUDGE_MODEL}")
     
-    # Initialize AzureChatOpenAI
-    llm_judge = AzureChatOpenAI(
-        azure_deployment=JUDGE_MODEL,  # Use the variable defined at the top
-        api_version=os.getenv("OPENAI_API_VERSION"),
+
+    # add model
+    llm_judge = ChatOpenAI(
+        model=JUDGE_MODEL,
         temperature=0.0,
         timeout=300
     )
@@ -95,7 +95,7 @@ def run_ragas_evaluation():
     
     try:
         my_run_config = RunConfig(
-            max_workers=1, 
+            max_workers=2,
             timeout=300
         )
 

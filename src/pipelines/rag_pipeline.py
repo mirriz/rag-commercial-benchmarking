@@ -27,26 +27,37 @@ RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 OLLAMA_MODEL = "llama3" 
 
 # Retrieval Settings
-RETRIEVAL_TOP_K = 75  # Fetch a broad net of candidates
-RERANK_TOP_N = 10      # Filter down to the best 10 for the LLM
+RETRIEVAL_TOP_K = 40  # Fetch a broad net of candidates
+RERANK_TOP_N = 15      # Filter down to the best 10 for the LLM
 
 SYSTEM_PROMPT = """
-You are the world's best financial analyst with extensive knowledge of SEC 10-K filings.
-Your goal is to provide accurate, concise, and direct answers based primarily on the provided context.
+<role>
+You are a Senior Equity Research Analyst at a top-tier investment bank. 
+Your goal is not just to report facts, but to synthesize them into a compelling strategic narrative. 
+You analyze SEC 10-K filings to explain the implications of the data, connecting specific details to broader themes like corporate strategy, competitive advantage, and market positioning.
+</role>
 
-CRITICAL RULES:
-1. Check Company Labels: The context chunks start with [COMPANY: Ticker]. You MUST ONLY use chunks that match the company asked about in the user's question.
-2. Direct Answers: Answer the question immediately. Do not start with "The query is asking about..." or "Based on the provided context...".
+
+<critical_constraints>
+1. Identify the Company From the Question: Identify the company question is asking about from the tickers.
+2. Check Company Labels: The context chunks start with [COMPANY: Ticker]. You MUST ONLY use chunks that match the company asked about in the user's question.
+3. No Fluff: Do not use filler phrases like "The provided text mentions..." or "Based on the provided context...". Start analysis immediately.
+</critical_constraints>
 
 
-Guidelines:
-1. Identify the specific company and answer requested.
+<guidelines>
+1. Identify the specific company ticker or name requested.
 2. If the context contains the answer, extract the exact number or text.
-3. You are permitted to do calculation. If a calculation is required (e.g. Gross Profit), perform it step-by-step using data from the context. Whenever this is the case, show your working.
-4. Do not hallucinate or use outside knowledge.
-5. State the response / explanation ALONE.
-6. Give reasoning and explanation for your answer. Single word or one sentence answers are not acceptable.
-7. Do not hallucinate specific numbers or facts about the company. Use general knowledge only for definitions or standard accounting principles when context is missing.
+3. When calculations are required, perform step-by-step using context data, showing all work. Actively scan contenxt for potential tables for numerical inputs.
+4. Give reasoning and explanation for your answer. Single word or one sentence answers are not acceptable. Use a professional financial tone
+5. Strict Fact Adherence: While your analysis should be interpretive, your underlying facts (names, dates, numbers) must be entirely correct based on the context.
+</guidelines>
+
+<context>
+{context_str}
+</context>
+
+Question: {query_str}
 """
 
 
@@ -177,12 +188,12 @@ def initialise_rag_system():
 
 
 
-    # Create the Query Engine with Post-Processing
+    # Create the Query Engine
     query_engine = RetrieverQueryEngine.from_args(
         retriever=final_retriever,
         node_postprocessors=[reranker],
         response_synthesizer=get_response_synthesizer(
-            response_mode="tree_summarize", 
+            response_mode="compact", 
             llm=llm
         ),
         llm=llm,
@@ -214,13 +225,13 @@ if __name__ == "__main__":
 
     if rag_query_engine:
         # Test
-        test_question = "Catherine R. Clay's role transition in innovation derivatives at Cboe Global Markets Inc. (CBOE) showcases its competitiveness."
+        test_question = "Delta in CBOE Data & Access Solutions rev from 2021-23."
         
         answer, sources = run_rag_query(rag_query_engine, test_question)
 
         print("\n" + "="*70)
-        print(f"| Final Answer:")
-        print(f"| {answer.strip()}")
+        print(f"Final Answer:")
+        print(f"{answer.strip()}")
         print("="*70)
         
         if sources:
@@ -228,8 +239,8 @@ if __name__ == "__main__":
             for i, node in enumerate(sources):
                 score = round(node.score, 4)
                 cleaned_text = node.text[:200].replace('\n', ' ')
-                print(f"| --- Rank {i+1} (Score: {score}) ---")
-                print(f"| {cleaned_text}...")
+                print(f"--- Rank {i+1} (Score: {score}) ---")
+                print(f"{cleaned_text}...")
         else:
             print("No source nodes retrieved")
         print("="*70)
