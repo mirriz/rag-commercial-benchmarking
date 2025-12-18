@@ -6,6 +6,7 @@ from datasets import Dataset
 from ragas import evaluate
 from ragas.metrics import (
     context_recall,
+    context_precision,
     faithfulness,
     answer_relevancy,
     answer_correctness,
@@ -57,7 +58,7 @@ def load_evaluation_data():
     return Dataset.from_dict(ragas_dict)
 
 def run_ragas_evaluation():
-    print("--- STARTING RAGAS EVALUATION WITH STANDARD OPENAI ---")
+    print("--- STARTING RAGAS EVALUATION WITH OPENAI GPT 5.1---")
     
     if "OPENAI_API_KEY" not in os.environ:
         print("OPENAI_API_KEY not found in environment variables")
@@ -83,9 +84,10 @@ def run_ragas_evaluation():
         encode_kwargs={'normalize_embeddings': True}
     )
 
-    # Metrics of choice
+    # Metrics
     metrics = [
         context_recall,
+        context_precision,
         faithfulness,
         answer_relevancy,
         answer_correctness
