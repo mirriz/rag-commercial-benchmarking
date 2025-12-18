@@ -22,10 +22,10 @@ load_dotenv()
 INPUT_FILE = "results/local_rag_v2_evaluation_dataset.json"
 OUTPUT_FILE = "results/ragas_scores_for_localRAG.csv"
 
-#JUDGE_MODEL = "gpt-5.1"
+JUDGE_MODEL = "gpt-5.1"
 
 # Low Cost
-JUDGE_MODEL = "gpt-5-mini" 
+#JUDGE_MODEL = "gpt-5-mini" 
 
 EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
