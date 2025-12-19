@@ -6,15 +6,15 @@ import time
 # Import your existing functions
 from ingest.download_data import get_qa_benchmark_data
 from pipelines.rag_pipeline import initialise_rag_system, run_rag_query
+from pipelines.zero_shot_pipeline import initialise_zero_shot_system, run_zero_shot_query
 
 
 OUTPUT_DIR = "results/"
-OUTPUT_FILE = "local_rag_v3_evaluation_dataset.json"
+OUTPUT_FILE = "commercial_zero_shot_evaluation_dataset.json"
 SAMPLE_SIZE = 500 # Set to None to run the FULL dataset
 
 def run_benchmark():
-    print("STARTING LOCAL RAG BENCHMARKING")
-
+    print("STARTING COMMERCIAL ZERO-SHOT BENCHMARKING")
     # Load Benchmark Data 
     print("\nLoading FinDER QA Benchmark Data...")
     try:
@@ -37,14 +37,14 @@ def run_benchmark():
         return
 
     # Initialise local RAG system
-    print("\nInitialising Local RAG Pipeline...")
-    rag_engine = initialise_rag_system()
+    print("\nInitialising Zero-Shot Pipeline...")
+    chain = initialise_zero_shot_system()
     
-    if not rag_engine:
-        print("Failed to initialise RAG system")
+    if not chain:
+        print("Failed to initialise Zero-Shot system")
         return
 
-    print("\nRunning Queries w/ Local LLM...")
+    print("\nRunning Queries w/ Commercial Zero-Shot Model...")
     
     results = {
         "question": [],
@@ -62,15 +62,13 @@ def run_benchmark():
 
         try:
             # Run the query
-            generated_answer, source_nodes = run_rag_query(rag_engine, query)
+            generated_answer, source_nodes = run_zero_shot_query(chain, query)
             
-            # Retrieved context for RAGAs
-            retrieved_contexts = [node.text for node in source_nodes]
             
             # Store data
             results["question"].append(query)
             results["answer"].append(generated_answer)
-            results["contexts"].append(retrieved_contexts)
+            results["contexts"].append(source_nodes)
             results["ground_truth"].append(ground_truths[i])
             
         except Exception as e:

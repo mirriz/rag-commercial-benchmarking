@@ -5,7 +5,7 @@ from pipelines.rag_pipeline import initialise_rag_system, run_rag_query
 # Settings
 SECURITY_DATASET_PATH = "data/security_benchmark_dataset/security_benchmark_dataset.json"
 OUTPUT_DIR = "results/"
-OUTPUT_FILE = "local_rag_v3_security_benchmark_results.json"
+OUTPUT_FILE = "commercial_zero_shot_security_benchmark_results.json"
 
 
 def run_security_benchmark():

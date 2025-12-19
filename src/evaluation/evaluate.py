@@ -19,8 +19,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 load_dotenv()
 
 # Settings
-INPUT_FILE = "results/local_rag_v2_evaluation_dataset.json"
-OUTPUT_FILE = "results/ragas_scores_for_localRAG.csv"
+INPUT_FILE = "results/commercial_zero_shot_evaluation_dataset.json"
+OUTPUT_FILE = "results/ragas/ragas_scores_commercial_zero_shot.csv"
 
 JUDGE_MODEL = "gpt-5.1"
 

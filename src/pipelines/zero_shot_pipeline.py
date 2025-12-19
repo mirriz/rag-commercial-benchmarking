@@ -47,8 +47,8 @@ def initialise_zero_shot_system():
 
 def run_zero_shot_query(chain, question):
     """
-    Executes a Zero-Shot query.
-    source_nodes will always be empty [] as there is no retrieval.
+    Executes a Zero Shot query.
+    Source_nodes will always be empty [] as there is no retrieval.
     """
     if chain is None:
         return "System failed to initialise.", []
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         print(f"{answer.strip()}")
         print("="*70)
         
-        # Verify Sources (Should be empty)
+        # Verify Sources
         if sources:
             print(f"| Retrieved {len(sources)} Source Chunks (Unexpected)")
         else:
