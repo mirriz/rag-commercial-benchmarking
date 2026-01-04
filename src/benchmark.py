@@ -63,11 +63,14 @@ def run_benchmark():
         try:
             # Run the query
             generated_answer, source_nodes = run_zero_shot_query(chain, query)
+
             
+            response = generated_answer[0]['text']
+            print(response)
             
             # Store data
             results["question"].append(query)
-            results["answer"].append(generated_answer)
+            results["answer"].append(response)
             results["contexts"].append(source_nodes)
             results["ground_truth"].append(ground_truths[i])
             

@@ -1,29 +1,29 @@
 import os
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 
 load_dotenv()
 
 # Settings
-MODEL_NAME = "gpt-5-mini"
+MODEL_NAME = "gemini-3-flash-preview"
 
 
 def initialise_zero_shot_system():
 
     print("\n--- Initialising Zero-Shot System ---")
     
-    if "OPENAI_API_KEY" not in os.environ:
-        print("Error: OPENAI_API_KEY not found in environment variables.")
+    if "GOOGLE_API_KEY" not in os.environ:
+        print("Error: GOOGLE_API_KEY not found in environment variables.")
         return None
 
     try:
         # Initialise LLM
-        llm = ChatOpenAI(
+        llm = ChatGoogleGenerativeAI(
             model=MODEL_NAME,
             temperature=0.0,
             max_retries=2,
-            request_timeout=60
+            timeout=60
         )
         
         # Create Prompt Template
@@ -81,13 +81,4 @@ if __name__ == "__main__":
 
         # Print Output
         print("\n" + "="*70)
-        print(f"Final Answer (Zero-Shot):")
-        print(f"{answer.strip()}")
-        print("="*70)
-        
-        # Verify Sources
-        if sources:
-            print(f"| Retrieved {len(sources)} Source Chunks (Unexpected)")
-        else:
-            print("No source nodes for Zero-Shot")
-        print("="*70)
+        print
