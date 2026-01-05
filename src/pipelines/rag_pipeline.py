@@ -28,7 +28,7 @@ OLLAMA_MODEL = "llama3"
 
 # Retrieval Settings
 RETRIEVAL_TOP_K = 40  # Fetch a broad net of candidates
-RERANK_TOP_N = 15      # Filter down to the best 10 for the LLM
+RERANK_TOP_N = 6      # Filter down to the best 10 for the LLM
 
 SYSTEM_PROMPT = """
 <role>
@@ -175,10 +175,11 @@ def initialise_rag_system():
         hybrid_retriever = QueryFusionRetriever(
             [vector_retriever, bm25_retriever],
             similarity_top_k=RETRIEVAL_TOP_K,
-            num_queries=1,  # Use original query only
+            num_queries=3,  # Use original query only
             mode="reciprocal_rerank",
             use_async=True,
-            verbose=True
+            verbose=True,
+            llm=llm
         )
         final_retriever = hybrid_retriever
     else:
