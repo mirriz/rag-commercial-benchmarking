@@ -28,29 +28,26 @@ OLLAMA_MODEL = "llama3"
 
 # Retrieval Settings
 RETRIEVAL_TOP_K = 40  # Fetch a broad net of candidates
-RERANK_TOP_N = 6      # Filter down to the best 10 for the LLM
+RERANK_TOP_N = 6
+
 
 SYSTEM_PROMPT = """
 <role>
-You are a Senior Equity Research Analyst at a top-tier investment bank. 
-Your goal is not just to report facts, but to synthesize them into a compelling strategic narrative. 
-You analyze SEC 10-K filings to explain the implications of the data, connecting specific details to broader themes like corporate strategy, competitive advantage, and market positioning.
+You are a Senior Equity Research Analyst at a top-tier investment bank.
+Your goal is to deliver high-conviction, data-backed insights from SEC 10-K filings. 
+Prioritise information density over length. Provide the answer immediately, then support it with concise evidence.
 </role>
 
-
 <critical_constraints>
-1. Identify the Company From the Question: Identify the company question is asking about from the tickers.
-2. Check Company Labels: The context chunks start with [COMPANY: Ticker]. You MUST ONLY use chunks that match the company asked about in the user's question.
-3. No Fluff: Do not use filler phrases like "The provided text mentions..." or "Based on the provided context...". Start analysis immediately.
+1. **Target Match:** Identify the company in the question, and then identify the ticker using your knowledge. ONLY use context chunks starting with [COMPANY: Ticker] that match the target. Ignore all others.
+2. **Zero Fluff:** Start the answer immediately. NEVER use filler phrases like "Based on the context," "The text states," or "In conclusion."
 </critical_constraints>
 
-
 <guidelines>
-1. Identify the specific company ticker or name requested.
-2. If the context contains the answer, extract the exact number or text.
-3. When calculations are required, perform step-by-step using context data, showing all work. Actively scan contenxt for potential tables for numerical inputs.
-4. Give reasoning and explanation for your answer. Single word or one sentence answers are not acceptable. Use a professional financial tone
-5. Strict Fact Adherence: While your analysis should be interpretive, your underlying facts (names, dates, numbers) must be entirely correct based on the context.
+1. **Structure:** Begin with a direct answer. Follow with bullet points for context/drivers.
+2. **Calculations:** If math is required, be compact. Show the logic in a single line (e.g., "($10M - $8M) / $8M = +25%").
+3. **Tone:** Use professional, clipped, institutional language. Avoid adjectives and narrative flowery.
+4. **Precision:** Extract exact numbers, dates, and names. Do not round unless necessary.
 </guidelines>
 
 <context>
@@ -107,8 +104,8 @@ def initialise_rag_system():
     try:
         llm = Ollama(
             model=OLLAMA_MODEL, 
-            temperature=0.0, 
-            request_timeout=300, 
+            temperature=0.1, 
+            request_timeout=400, 
             system_prompt=SYSTEM_PROMPT
         )
         Settings.llm = llm
@@ -175,7 +172,7 @@ def initialise_rag_system():
         hybrid_retriever = QueryFusionRetriever(
             [vector_retriever, bm25_retriever],
             similarity_top_k=RETRIEVAL_TOP_K,
-            num_queries=3,  # Use original query only
+            num_queries=1,
             mode="reciprocal_rerank",
             use_async=True,
             verbose=True,
@@ -226,7 +223,7 @@ if __name__ == "__main__":
 
     if rag_query_engine:
         # Test
-        test_question = "Delta in CBOE Data & Access Solutions rev from 2021-23."
+        test_question = "Cboe's operational stability, governance in cybersecurity, and financial health."
         
         answer, sources = run_rag_query(rag_query_engine, test_question)
 

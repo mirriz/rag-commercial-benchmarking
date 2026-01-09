@@ -20,7 +20,7 @@ EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 COLLECTION_NAME = "finder_rag_collection" 
 
 CHUNK_SIZE = 512  
-CHUNK_OVERLAP = 64
+CHUNK_OVERLAP = 140
 
 
 
