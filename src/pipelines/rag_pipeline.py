@@ -28,7 +28,7 @@ OLLAMA_MODEL = "llama3"
 
 # Retrieval Settings
 RETRIEVAL_TOP_K = 40  # Fetch a broad net of candidates
-RERANK_TOP_N = 15      # Filter down to the best 10 for the LLM
+RERANK_TOP_N = 6      # Filter down to the best 10 for the LLM
 
 SYSTEM_PROMPT = """
 <role>
@@ -112,7 +112,7 @@ def initialise_rag_system():
     try:
         llm = Ollama(
             model=OLLAMA_MODEL, 
-            temperature=0.0, 
+            temperature=0.1, 
             request_timeout=300, 
             system_prompt=SYSTEM_PROMPT
         )
