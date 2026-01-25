@@ -19,8 +19,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 load_dotenv()
 
 # Settings
-INPUT_FILE = "results/commercial_zero_shot_evaluation_dataset.json"
-OUTPUT_FILE = "results/ragas/ragas_scores_commercial_zero_shot.csv"
+INPUT_FILE = "results/local_rag_v3_evaluation_dataset.json"
+OUTPUT_FILE = "results/ragas/ragas_scores_local_rag_v3.csv"
 
 JUDGE_MODEL = "gemini-3-flash-preview"
 
@@ -101,8 +101,8 @@ def run_ragas_evaluation():
     
     try:
         my_run_config = RunConfig(
-            max_workers=12,
-            timeout=400
+            max_workers=16,
+            timeout=500
         )
 
         results = evaluate(

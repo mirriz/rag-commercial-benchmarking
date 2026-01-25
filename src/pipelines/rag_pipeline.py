@@ -2,34 +2,44 @@ import os
 import pickle
 import chromadb
 import torch
+import nest_asyncio
+from dotenv import load_dotenv
+
+# Apply nest_asyncio to prevent event loop errors in notebooks
+nest_asyncio.apply()
 
 from llama_index.core import (
     VectorStoreIndex, 
     get_response_synthesizer,
     Settings
 )
-from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.langchain import LangchainEmbedding 
+
+# --- CHANGED: Native LlamaIndex Imports (Fixes Compatibility) ---
+from llama_index.llms.gemini import Gemini
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
 from llama_index.vector_stores.chroma import ChromaVectorStore 
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import SentenceTransformerRerank
 from llama_index.retrievers.bm25 import BM25Retriever
 from llama_index.core.retrievers import QueryFusionRetriever
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+load_dotenv()
 
+# --- Configuration ---
 VECTOR_STORE_DIR = "data/vectorstore-v2"
 COLLECTION_NAME = "finder_rag_collection" 
 NODES_CACHE_PATH = "data/bm25_nodes/bm25_nodes.pkl" 
 
-EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5" 
 RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
-OLLAMA_MODEL = "llama3" 
+
+GEMINI_MODEL = "gemini-3-flash-preview" # Or "models/gemini-1.5-flash"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") 
 
 # Retrieval Settings
-RETRIEVAL_TOP_K = 40  # Fetch a broad net of candidates
+RETRIEVAL_TOP_K = 40 
 RERANK_TOP_N = 6
-
 
 SYSTEM_PROMPT = """
 <role>
@@ -57,13 +67,13 @@ Prioritise information density over length. Provide the answer immediately, then
 Question: {query_str}
 """
 
-
 def load_nodes_for_bm25(cache_path):
     """
-    Loads BM25 nodes from pickle cache
+    Loads BM25 nodes from pickle cache. 
+    Ensure this cache is in sync with your ChromaDB!
     """
     if not os.path.exists(cache_path):
-        print(f"BM25 cache not found.")
+        print(f"BM25 cache not found at {cache_path}.")
         return None
         
     print(f"Loading nodes for BM25 from {cache_path}...")
@@ -72,52 +82,47 @@ def load_nodes_for_bm25(cache_path):
     print(f"Loaded {len(nodes)} nodes.")
     return nodes
 
-
-
 def initialise_rag_system():
-    """
-    Initialises self-hosted RAG query engine with BGE Embeddings and Re-ranking.
-    """
     print("\n--- Initialising RAG System ---")
     
+    if not GOOGLE_API_KEY:
+        print("CRITICAL ERROR: GOOGLE_API_KEY environment variable not set.")
+        return None
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
-
-
-    # Initialise Embedding Model
+    # 1. Initialise Embedding Model (Native LlamaIndex)
     try:
-        base_embed = HuggingFaceEmbeddings(
+        embed_model = HuggingFaceEmbedding(
             model_name=EMBEDDING_MODEL,
-            model_kwargs={'device': device},
-            encode_kwargs={'normalize_embeddings': True}
+            device=device,
+            embed_batch_size=10, 
+            normalize=True
         )
-        embed_model = LangchainEmbedding(base_embed)
+        Settings.embed_model = embed_model # Set global setting
         print(f"Embedding Model '{EMBEDDING_MODEL}' initialised")
     except Exception as e:
         print(f"Error initialising embedding model: {e}")
         return None
 
-
-
-        # Initialise Local LLM
+    # 2. Initialise Gemini (Native LlamaIndex)
     try:
-        llm = Ollama(
-            model=OLLAMA_MODEL, 
-            temperature=0.1, 
-            request_timeout=400, 
-            system_prompt=SYSTEM_PROMPT
+        llm = Gemini(
+            model=GEMINI_MODEL,
+            api_key=GOOGLE_API_KEY,
+            temperature=0.1,
+            system_prompt=SYSTEM_PROMPT, # Correct argument for system prompt
+            timeout=300
         )
-        Settings.llm = llm
-        print(f"Local LLM '{OLLAMA_MODEL}' connected")
+        
+        Settings.llm = llm # Set global setting
+        print(f"LLM '{GEMINI_MODEL}' connected")
+
     except Exception as e:
-        print(f"Error initialising Ollama LLM: {e}")
+        print(f"Error initialising Gemini LLM: {e}")
         return None
-    
 
-
-
-    # Initialise Re-ranker
+    # 3. Initialise Re-ranker
     try:
         print(f"Loading Re-ranker: {RERANKER_MODEL}...")
         reranker = SentenceTransformerRerank(
@@ -130,10 +135,7 @@ def initialise_rag_system():
         print(f"Error loading Re-ranker: {e}")
         return None
 
-
-
-
-    # Connect to ChromaDB
+    # 4. Connect to ChromaDB
     try:
         db = chromadb.PersistentClient(path=VECTOR_STORE_DIR)
         chroma_collection = db.get_or_create_collection(COLLECTION_NAME)
@@ -143,88 +145,60 @@ def initialise_rag_system():
             vector_store=vector_store, 
             embed_model=embed_model,
         )
-
-        # Vector Retriever
         vector_retriever = index.as_retriever(similarity_top_k=RETRIEVAL_TOP_K)
-
         print(f"Vector Store '{COLLECTION_NAME}' loaded from disk")
-
     except Exception as e:
         print(f"Error loading ChromaDB: {e}")
         return None
-    
 
-
-
-    # Create Hybrid Retriever
+    # 5. Create Hybrid Retriever
     nodes = load_nodes_for_bm25(NODES_CACHE_PATH)
     
     if nodes:
-        # BM25 Retriever
         bm25_retriever = BM25Retriever.from_defaults(
             nodes=nodes, 
             similarity_top_k=RETRIEVAL_TOP_K
         )
         print("BM25 Retriever initialised.")
 
-        # Fuse Retrievers
         print("Combining Vector and BM25 retrievers...")
         hybrid_retriever = QueryFusionRetriever(
             [vector_retriever, bm25_retriever],
             similarity_top_k=RETRIEVAL_TOP_K,
-            num_queries=1,
+            num_queries=1, 
             mode="reciprocal_rerank",
             use_async=True,
             verbose=True,
-            llm=llm
+            llm=llm 
         )
         final_retriever = hybrid_retriever
     else:
-        print("Falling back to Vector-only retrieval.")
+        print("Warning: BM25 nodes not found. Falling back to Vector-only retrieval.")
         final_retriever = vector_retriever
 
-
-
-
-    # Create the Query Engine
+    # 6. Create Query Engine
     query_engine = RetrieverQueryEngine.from_args(
         retriever=final_retriever,
         node_postprocessors=[reranker],
-        response_synthesizer=get_response_synthesizer(
-            response_mode="compact", 
-            llm=llm
-        ),
-        llm=llm,
+        llm=llm
     )
-
-
-
 
     print("--- Initialisation Complete ---")
     return query_engine
 
 def run_rag_query(query_engine, question):
-    """Executes a RAG query and returns the answer and source chunks"""
     if query_engine is None:
         return "RAG system failed to initialise.", []
 
     print(f"\n> Querying: {question}")
-    
-    # Execute the query
     response = query_engine.query(question)
-    
-    answer = str(response)
-    source_nodes = response.source_nodes
-    
-    return answer, source_nodes
+    return str(response), response.source_nodes
 
 if __name__ == "__main__":
     rag_query_engine = initialise_rag_system()
 
     if rag_query_engine:
-        # Test
         test_question = "Cboe's operational stability, governance in cybersecurity, and financial health."
-        
         answer, sources = run_rag_query(rag_query_engine, test_question)
 
         print("\n" + "="*70)
@@ -235,7 +209,7 @@ if __name__ == "__main__":
         if sources:
             print(f"| Retrieved & Re-ranked {len(sources)} Source Chunks:")
             for i, node in enumerate(sources):
-                score = round(node.score, 4)
+                score = round(node.score, 4) if node.score else 0.0
                 cleaned_text = node.text[:200].replace('\n', ' ')
                 print(f"--- Rank {i+1} (Score: {score}) ---")
                 print(f"{cleaned_text}...")
