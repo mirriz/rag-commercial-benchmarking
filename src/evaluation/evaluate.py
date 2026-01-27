@@ -19,8 +19,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 load_dotenv()
 
 # Settings
-INPUT_FILE = "results/local_rag_v3_evaluation_dataset.json"
-OUTPUT_FILE = "results/ragas/ragas_scores_local_rag_v3.csv"
+INPUT_FILE = "results/commercial_rag_evaluation_dataset.json"
+OUTPUT_FILE = "results/ragas/ragas_scores_commercial_rag_evaluation_dataset.csv"
 
 JUDGE_MODEL = "gemini-3-flash-preview"
 
@@ -77,7 +77,7 @@ def run_ragas_evaluation():
     llm_judge = ChatGoogleGenerativeAI(
         model=JUDGE_MODEL,
         temperature=0.0,
-        timeout=300,
+        timeout=900,
         safety_settings=safety_settings
     )
     
@@ -101,7 +101,7 @@ def run_ragas_evaluation():
     
     try:
         my_run_config = RunConfig(
-            max_workers=16,
+            max_workers=12,
             timeout=500
         )
 
