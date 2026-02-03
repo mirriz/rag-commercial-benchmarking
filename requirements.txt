@@ -19,6 +19,7 @@ openai
 ollama
 rank_bm25
 
+"unstructured[md]"
 ragas
 pandas
 datasets

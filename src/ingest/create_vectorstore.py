@@ -1,67 +1,53 @@
 import os
-import torch
-import chromadb
 import shutil
 import pickle
 
-from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
+from langchain_text_splitters import MarkdownTextSplitter 
 from llama_index.core.schema import TextNode  
 
-RAW_DATA_PATH = "data/10ks-raw/"
+RAW_DATA_PATH = "data/10k-markdown/"
 VECTOR_STORE_DIR = "data/vectorstore-v2"
 NODES_CACHE_PATH = "data/bm25_nodes/bm25_nodes.pkl"  
 
-# Switched to BGE-Base
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 COLLECTION_NAME = "finder_rag_collection" 
 
-CHUNK_SIZE = 512  
-CHUNK_OVERLAP = 140
-
-
-
-
+CHUNK_SIZE = 2000  
+CHUNK_OVERLAP = 200
 
 def load_and_split_documents():
-    """Loads all documents from the raw 10-k directory and splits them."""
-    
-    print(f"Loading documents from {RAW_DATA_PATH}...")
-    loader = DirectoryLoader(RAW_DATA_PATH, glob="**/*.txt", silent_errors=True)
+    print(f"Loading Markdown documents from {RAW_DATA_PATH}...")
+    loader = DirectoryLoader(
+        RAW_DATA_PATH, 
+        glob="**/*.md", 
+        loader_cls=TextLoader, 
+        loader_kwargs={'encoding': 'utf-8'},
+        silent_errors=False
+    )
     documents = loader.load()
-    print(f"Loaded {len(documents)} source files.")
+    print(f"Loaded {len(documents)} files.")
 
-    # Split the documents for RAG
-    text_splitter = RecursiveCharacterTextSplitter(
+    text_splitter = MarkdownTextSplitter(
         chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
-        separators=["\n\n", "\n", " ", ""]
+        chunk_overlap=CHUNK_OVERLAP
     )
     chunks = text_splitter.split_documents(documents)
 
-    # Prepend the company ticker to the text of every chunk.
     for chunk in chunks:
         file_path = chunk.metadata.get('source', '')
-        company = os.path.basename(file_path).replace('.txt', '')
-        chunk.page_content = f"[COMPANY: {company}] {chunk.page_content}"
-        chunk.metadata['company_ticker'] = company
+        filename = os.path.basename(file_path)
+        company_ticker = filename.rsplit('.', 1)[0]
+        chunk.metadata['company_ticker'] = company_ticker
+        chunk.page_content = f"[COMPANY: {company_ticker}]\n{chunk.page_content}"
     
-    print(f"Created {len(chunks)} total enriched chunks.")
+    print(f"Created {len(chunks)} Markdown-aware chunks.")
     return chunks
 
-
-
-
-
 def save_nodes_for_bm25(langchain_chunks):
-    """
-    The bridge allowing the RAG pipeline to use langchain chunks for BM25.
-    """
-    print(f"Converting {len(langchain_chunks)} chunks to pickle")
-    
+    print(f"Converting {len(langchain_chunks)} chunks to nodes for BM25...")
     llama_nodes = []
     for chunk in langchain_chunks:
         node = TextNode(
@@ -70,33 +56,25 @@ def save_nodes_for_bm25(langchain_chunks):
         )
         llama_nodes.append(node)
 
-    # Save
-    if not os.path.exists("data"):
-        os.makedirs("data")
+    if not os.path.exists(os.path.dirname(NODES_CACHE_PATH)):
+        os.makedirs(os.path.dirname(NODES_CACHE_PATH))
         
     with open(NODES_CACHE_PATH, "wb") as f:
         pickle.dump(llama_nodes, f)
-    
     print(f"Saved BM25 nodes to {NODES_CACHE_PATH}")
 
-
-
-
-
 def create_and_save_vectorstore(chunks):
-    """Embeds document chunks and saves the vector store locally"""
-    
-    # Check if vectorstore exists
     if os.path.exists(VECTOR_STORE_DIR):
-        print(f"Removing existing vectorstore at {VECTOR_STORE_DIR} to rebuild...")
+        print("Removing old vectorstore...")
         shutil.rmtree(VECTOR_STORE_DIR)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Initialising embedding model '{EMBEDDING_MODEL_NAME}' on {device}...")
+    device = "cpu"
+    print(f"Embedding with {EMBEDDING_MODEL_NAME} on {device}...")
     
-    # BGE requires specific parameters
+    # 1. Initialize Embeddings with a safe batch size
+    # This prevents the model from trying to process too much at once internally
     model_kwargs = {'device': device}
-    encode_kwargs = {'normalize_embeddings': True}
+    encode_kwargs = {'normalize_embeddings': True, 'batch_size': 32}
 
     embeddings = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL_NAME,
@@ -104,24 +82,30 @@ def create_and_save_vectorstore(chunks):
         encode_kwargs=encode_kwargs
     )
 
-    print(f"Creating and saving ChromaDB to {VECTOR_STORE_DIR}...")
+    print(f"Creating ChromaDB at {VECTOR_STORE_DIR}...")
+    
+    BATCH_SIZE = 100
+    total_chunks = len(chunks)
+    
+    # Create the DB with the first batch to initialize it
+    first_batch = chunks[:BATCH_SIZE]
     vectorstore = Chroma.from_documents(
-        documents=chunks,
+        documents=first_batch,
         embedding=embeddings,
         persist_directory=VECTOR_STORE_DIR,
         collection_name=COLLECTION_NAME
     )
-    vectorstore.persist() 
-    print("Vector Store creation complete.")
-    return vectorstore
+    print(f"Processed batch 1/{(total_chunks // BATCH_SIZE) + 1}")
 
+    # Process the rest
+    for i in range(BATCH_SIZE, total_chunks, BATCH_SIZE):
+        batch = chunks[i : i + BATCH_SIZE]
+        vectorstore.add_documents(batch)
+        print(f"Processed batch {(i // BATCH_SIZE) + 1}/{(total_chunks // BATCH_SIZE) + 1}")
 
-
-
+    print("Vector Store created successfully.")
 
 if __name__ == "__main__":
     doc_chunks = load_and_split_documents()
-    
     create_and_save_vectorstore(doc_chunks)
-    
     save_nodes_for_bm25(doc_chunks)
