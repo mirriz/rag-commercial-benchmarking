@@ -27,8 +27,8 @@ RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 OLLAMA_MODEL = "llama3" 
 
 # Retrieval Settings
-RETRIEVAL_TOP_K = 40  # Fetch a broad net of candidates
-RERANK_TOP_N = 6
+RETRIEVAL_TOP_K = 15 
+RERANK_TOP_N = 8 
 
 
 SYSTEM_PROMPT = """
@@ -80,7 +80,7 @@ def initialise_rag_system():
     """
     print("\n--- Initialising RAG System ---")
     
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
 
 
 
@@ -191,7 +191,7 @@ def initialise_rag_system():
         retriever=final_retriever,
         node_postprocessors=[reranker],
         response_synthesizer=get_response_synthesizer(
-            response_mode="compact", 
+            response_mode="tree_summarize", 
             llm=llm
         ),
         llm=llm,
