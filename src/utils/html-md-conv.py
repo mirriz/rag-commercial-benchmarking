@@ -2,8 +2,8 @@ import os
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 
-# --- CONFIG ---
-INPUT_DIR = "10k/"   # Place your raw HTML files here
+
+INPUT_DIR = "10k/" 
 OUTPUT_DIR = "10k-markdown/"
 
 if not os.path.exists(OUTPUT_DIR):
@@ -19,12 +19,10 @@ def clean_and_convert(html_content):
     for script in soup(["script", "style", "head", "meta", "noscript"]):
         script.decompose()
         
-    # 2. Convert to Markdown
     # 'tables' option ensures <table> tags become Markdown tables
     markdown_text = md(str(soup), heading_style="ATX", strip=['a', 'img'])
     
-    # 3. Post-processing cleanup (optional)
-    # Remove excessive newlines often left by conversion
+    # Remove excessive newlines
     lines = markdown_text.split('\n')
     cleaned_lines = [line.strip() for line in lines if line.strip()]
     return '\n\n'.join(cleaned_lines)
@@ -33,6 +31,8 @@ def process_html_files():
     files = [f for f in os.listdir(INPUT_DIR) if f.lower().endswith(('.html', '.htm'))]
     print(f"Found {len(files)} HTML files. Converting to Markdown...")
     
+
+    # Iterate files
     for i, filename in enumerate(files):
         input_path = os.path.join(INPUT_DIR, filename)
         output_filename = filename.rsplit('.', 1)[0] + ".md"
@@ -48,6 +48,7 @@ def process_html_files():
             with open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
                 html_content = f.read()
                 
+            # Convert HTML to Markdown with cleaning
             markdown_content = clean_and_convert(html_content)
             
             with open(output_path, 'w', encoding='utf-8') as f:
