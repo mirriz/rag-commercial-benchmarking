@@ -19,8 +19,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 load_dotenv()
 
 # Settings
-INPUT_FILE = "results/commercial_rag_evaluation_dataset.json"
-OUTPUT_FILE = "results/ragas/ragas_scores_commercial_rag_evaluation_dataset.csv"
+INPUT_FILE = "results/local_rag_v3_evaluation_dataset.json"
+OUTPUT_FILE = "results/ragas/ragas_scores_local_rag_v3_evaluation_dataset.csv"
 
 JUDGE_MODEL = "gemini-3-flash-preview"
 
