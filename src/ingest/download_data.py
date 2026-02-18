@@ -6,8 +6,6 @@ QA_DATA_PATH = "data/finder_data/train"
 
 
 
-
-
 def load_finder_qa_benchmark():
     """Loads the FinDER QA dataset"""
 
