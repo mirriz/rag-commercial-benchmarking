@@ -1,6 +1,6 @@
 # RAG Commercial Benchmarking
 
-This repository contains the benchmarking suite for evaluating a commercial Large Language Model (Gemini) augmented with a locally hosted, high-performance Retrieval-Augmented Generation (RAG) pipeline. It is specifically designed to query and reason over complex, unstructured financial data (SEC 10-K filings) using the FinDER QA dataset.
+This repository contains the benchmarking suite for evaluating a commercial Large Language Model augmented with a locally hosted, high-performance Retrieval-Augmented Generation (RAG) pipeline. It is specifically designed to query and reason over complex financial data (SEC 10-K filings) using the FinDER QA dataset.
 
 ## Architecture & Tech Stack
 
