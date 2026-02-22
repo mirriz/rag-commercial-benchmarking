@@ -76,7 +76,7 @@ def initialise_rag_system():
         print("CRITICAL ERROR: GOOGLE_API_KEY not set.")
         return None
 
-    device = "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     embed_model = HuggingFaceEmbedding(
         model_name=EMBEDDING_MODEL,
