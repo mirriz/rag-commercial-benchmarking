@@ -6,7 +6,8 @@ from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import MarkdownTextSplitter 
-from llama_index.core.schema import TextNode  
+from llama_index.core.schema import TextNode
+import torch  
 
 RAW_DATA_PATH = "data/10k-markdown/"
 VECTOR_STORE_DIR = "data/vectorstore-v2"
@@ -68,7 +69,7 @@ def create_and_save_vectorstore(chunks):
         print("Removing old vectorstore...")
         shutil.rmtree(VECTOR_STORE_DIR)
 
-    device = "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Embedding with {EMBEDDING_MODEL_NAME} on {device}...")
     
     # 1. Initialize Embeddings with a safe batch size
