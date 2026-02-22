@@ -20,9 +20,9 @@ load_dotenv()
 
 # Settings
 INPUT_FILE = "results/local_rag_v3_evaluation_dataset.json"
-OUTPUT_FILE = "results/ragas/ragas_scores_local_rag_v3.csv"
+OUTPUT_FILE = "results/ragas/ragas_scores_local_rag_v3_evaluation_dataset.csv"
 
-JUDGE_MODEL = "gemini-3-flash-preview"
+JUDGE_MODEL = "gemini-3-pro-preview"
 
 EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
@@ -73,11 +73,11 @@ def run_ragas_evaluation():
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     }
 
-    # add model
+    # Add model
     llm_judge = ChatGoogleGenerativeAI(
         model=JUDGE_MODEL,
         temperature=0.0,
-        timeout=300,
+        timeout=900,
         safety_settings=safety_settings
     )
     
@@ -102,7 +102,7 @@ def run_ragas_evaluation():
     try:
         my_run_config = RunConfig(
             max_workers=12,
-            timeout=400
+            timeout=500
         )
 
         results = evaluate(
