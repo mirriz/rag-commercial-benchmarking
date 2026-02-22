@@ -2,104 +2,77 @@ import os
 import pandas as pd
 import json
 import time
-
-# Import your existing functions
 from ingest.download_data import get_qa_benchmark_data
 from pipelines.rag_pipeline import initialise_rag_system, run_rag_query
 
-
 OUTPUT_DIR = "results/"
 OUTPUT_FILE = "local_rag_v3_evaluation_dataset.json"
-SAMPLE_SIZE = 500 # Set to None to run the FULL dataset
+SAMPLE_SIZE = 500
 
 def run_benchmark():
-    print("STARTING LOCAL RAG BENCHMARKING")
-
-    # Load Benchmark Data 
-    print("\nLoading FinDER QA Benchmark Data...")
     try:
         questions, ground_truths, ground_truth_contexts = get_qa_benchmark_data()
         
         if not questions:
-            print("Error: No data found. Please run src/ingest/download_data.py")
             return
 
         if SAMPLE_SIZE:
-            print(f"Limiting run to first {SAMPLE_SIZE}")
             questions = questions[:SAMPLE_SIZE]
             ground_truths = ground_truths[:SAMPLE_SIZE]
             ground_truth_contexts = ground_truth_contexts[:SAMPLE_SIZE]
-        else:
-            print(f"Running on full dataset.")
-            
-    except Exception as e:
-        print(f"Error loading data: {e}")
+    except Exception:
         return
 
-    # Initialise local RAG system
-    print("\nInitialising Local RAG Pipeline...")
-    rag_engine = initialise_rag_system()
-    
-    if not rag_engine:
-        print("Failed to initialise RAG system")
-        return
+    output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
+    processed_lookup = {}
 
-    print("\nRunning Queries w/ Local LLM...")
-    
-    results = {
-        "question": [],
-        "answer": [],
-        "contexts": [],
-        "ground_truth": []
-    }
+    if os.path.exists(output_path):
+        try:
+            df_existing = pd.read_json(output_path, orient="records")
+            if not df_existing.empty:
+                for _, row in df_existing.iterrows():
+                    if row["answer"] and row["answer"] != "Error generating response":
+                        processed_lookup[row["question"]] = row.to_dict()
+        except Exception:
+            pass
 
-    total_queries = len(questions)
-    start_time = time.time()
+    indices_to_run = [i for i, q in enumerate(questions) if q not in processed_lookup]
+
+    rag_engine = None
+    if indices_to_run:
+        rag_engine = initialise_rag_system()
+
+    final_results = []
 
     for i, query in enumerate(questions):
-
-        print(f"Processing query {i+1}")
-
-        try:
-            # Run the query
-            generated_answer, source_nodes = run_rag_query(rag_engine, query)
-            
-            # Retrieved context for RAGAs
-            retrieved_contexts = [node.text for node in source_nodes]
-            
-            # Store data
-            results["question"].append(query)
-            results["answer"].append(generated_answer)
-            results["contexts"].append(retrieved_contexts)
-            results["ground_truth"].append(ground_truths[i])
-            
-        except Exception as e:
-            print(f"\nError processing query {i}: {e}")
-            results["question"].append(query)
-            results["answer"].append("Error generating response")
-            results["contexts"].append([])
-            results["ground_truth"].append(ground_truths[i])
+        if query in processed_lookup:
+            final_results.append(processed_lookup[query])
             continue
 
-    elapsed_time = time.time() - start_time
-    print(f"Completed in {elapsed_time:.2f} seconds ({elapsed_time/total_queries:.2f}s per query).")
-    
-    # Create DataFrame
-    df = pd.DataFrame(results)
-    
-    # Ensure Output Directory Exists
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILE)
-    
-    # Save as a standard JSON list
-    df.to_json(output_path, orient="records", indent=4)
-    
-    print(f"Benchmark Complete!")
-    print(f"Results saved to: {output_path}")
-    
-    # PReview
-    print("\nOutput:")
-    print(df[['question', 'answer']].head(2))
+        try:
+            generated_answer, source_nodes = run_rag_query(rag_engine, query)
+            retrieved_contexts = [node.text for node in source_nodes]
+            
+            new_entry = {
+                "question": query,
+                "answer": generated_answer,
+                "contexts": retrieved_contexts,
+                "ground_truth": ground_truths[i]
+            }
+            final_results.append(new_entry)
+
+        except Exception:
+            error_entry = {
+                "question": query,
+                "answer": "Error generating response",
+                "contexts": [],
+                "ground_truth": ground_truths[i]
+            }
+            final_results.append(error_entry)
+
+        df = pd.DataFrame(final_results)
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        df.to_json(output_path, orient="records", indent=4)
 
 if __name__ == "__main__":
     run_benchmark()
