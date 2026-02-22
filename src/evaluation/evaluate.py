@@ -13,19 +13,16 @@ from ragas.metrics import (
 )
 from ragas.run_config import RunConfig
 
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI, HarmBlockThreshold, HarmCategory
 from langchain_community.embeddings import HuggingFaceEmbeddings 
 
 load_dotenv()
 
 # Settings
-INPUT_FILE = "results/local_rag_v2_evaluation_dataset.json"
-OUTPUT_FILE = "results/ragas_scores_for_localRAG.csv"
+INPUT_FILE = "results/local_rag_v3_evaluation_dataset.json"
+OUTPUT_FILE = "results/ragas/ragas_scores_local_rag_v3_evaluation_dataset.csv"
 
-#JUDGE_MODEL = "gpt-5.1"
-
-# Low Cost
-JUDGE_MODEL = "gpt-5-mini" 
+JUDGE_MODEL = "gemini-3-pro-preview"
 
 EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
@@ -45,7 +42,7 @@ def load_evaluation_data():
     }
 
     for entry in data:
-        # Filter out failed responses
+        # Filter out any failed responses
         if entry.get("answer") == "Error generating response" or not entry.get("answer"):
             print("Not all answers generated. quitting evaluation")
             return None
@@ -58,10 +55,10 @@ def load_evaluation_data():
     return Dataset.from_dict(ragas_dict)
 
 def run_ragas_evaluation():
-    print("--- STARTING RAGAS EVALUATION WITH OPENAI GPT 5.1---")
+    print("--- STARTING RAGAS EVALUATION WITH GEMINI 3 PRO---")
     
-    if "OPENAI_API_KEY" not in os.environ:
-        print("OPENAI_API_KEY not found in environment variables")
+    if "GOOGLE_API_KEY" not in os.environ:
+        print("GOOGLE_API_KEY not found in environment variables")
         return
 
     dataset = load_evaluation_data()
@@ -69,18 +66,25 @@ def run_ragas_evaluation():
 
     print(f"Initialising Judge {JUDGE_MODEL}")
     
+    safety_settings = {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    }
 
-    # add model
-    llm_judge = ChatOpenAI(
+    # Add model
+    llm_judge = ChatGoogleGenerativeAI(
         model=JUDGE_MODEL,
         temperature=0.0,
-        timeout=300
+        timeout=900,
+        safety_settings=safety_settings
     )
     
     print(f"Initialising Local Embeddings (Model: {EMBEDDING_MODEL})...")
     embeddings_judge = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,
-        model_kwargs={'device': 'cuda'}, # Change to 'cpu' if you don't have a GPU
+        model_kwargs={'device': 'cuda'},
         encode_kwargs={'normalize_embeddings': True}
     )
 
@@ -97,8 +101,8 @@ def run_ragas_evaluation():
     
     try:
         my_run_config = RunConfig(
-            max_workers=2,
-            timeout=300
+            max_workers=12,
+            timeout=500
         )
 
         results = evaluate(
