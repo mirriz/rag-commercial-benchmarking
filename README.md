@@ -6,7 +6,7 @@ This repository contains the benchmarking suite for evaluating a Large Language 
 
 ## Architecture & Tech Stack
 
-The RAG pipeline is orchestrated using **LlamaIndex** and utilizes a hybrid retrieval approach to maximize context recall and precision:
+The RAG pipeline is orchestrated using **LlamaIndex** and uses a hybrid retrieval approach to maximize context recall and precision:
 * **LLM**: Gemini 3 Flash (`gemini-3-flash-preview`), Llama3:8B
 * **Dense Retrieval**: ChromaDB with HuggingFace embeddings (`BAAI/bge-base-en-v1.5`,`all-MiniLM-L6-v2`)
 * **Sparse Retrieval**: BM25 keyword matching (cached via Pickle)
