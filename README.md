@@ -1,6 +1,6 @@
 # RAG Commercial Benchmarking
 
-This report evaluates the viability of self-hosted Retrieval-Augmented Generation (RAG) systems as a secure alternative to commercial Large Language Model (LLM) APIs for enterprise data management.
+Evaluates the viability of self-hosted Retrieval-Augmented Generation (RAG) systems as a secure alternative to commercial Large Language Model (LLM) APIs for enterprise data management.
 
 This repository contains the benchmarking suite for evaluating a Large Language Model augmented with a locally hosted, high-performance Retrieval-Augmented Generation (RAG) pipeline. It is specifically designed to query and reason over complex financial data (SEC 10-K filings) using the FinDER QA dataset.
 
